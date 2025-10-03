@@ -1,67 +1,52 @@
-const http = require("http");
-const url = require("url");
-const fs = require("fs");
-const path = require("path");
+// index.js
+// where your node app starts
 
-function sendJSON(res, obj) {
-  res.writeHead(200, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(obj));
-}
+// init project
+const express = require('express');
+const app = express();
 
-function sendNotFound(res) {
-  res.writeHead(404, { "Content-Type": "text/plain" });
-  res.end("404 Not Found");
-}
+// enable CORS (so your API is remotely testable by FCC)
+const cors = require('cors');
+app.use(cors({ optionsSuccessStatus: 200 }));  // some legacy browsers choke on 204
 
-function serveStaticFile(res, filepath, contentType) {
-  fs.readFile(filepath, (err, content) => {
-    if (err) sendNotFound(res);
-    else {
-      res.writeHead(200, { "Content-Type": contentType });
-      res.end(content);
-    }
-  });
-}
+// serve static files
+app.use(express.static('public'));
 
-const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
-
-  // Root route
-  if (pathname === "/") {
-    serveStaticFile(res, path.join(__dirname, "views", "index.html"), "text/html");
-    return;
-  }
-
-  // API endpoint
-  if (pathname.startsWith("/api")) {
-    const parts = pathname.split("/");
-    let dateParam = parts[2]; // may be undefined
-    let date;
-
-    if (!dateParam) {
-      // No date → current time
-      date = new Date();
-    } else if (/^\d+$/.test(dateParam)) {
-      // Only digits → treat as milliseconds
-      date = new Date(Number(dateParam));
-    } else {
-      // Date string → pass as-is
-      date = new Date(dateParam);
-    }
-
-    // Invalid date
-    if (isNaN(date.getTime())) {
-      sendJSON(res, { error: "Invalid Date" });
-    } else {
-      sendJSON(res, { unix: date.getTime(), utc: date.toUTCString() });
-    }
-    return;
-  }
-
-  sendNotFound(res);
+// Root route: serve index.html
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + '/views/index.html');
 });
 
-const listener = server.listen(process.env.PORT || 3000, () => {
-  console.log("Your app is listening on port " + listener.address().port);
+// Hello API example
+app.get("/api/hello", (req, res) => {
+  res.json({ greeting: 'hello API' });
+});
+
+// Timestamp Microservice API
+app.get("/api/:date?", (req, res) => {
+  let dateParam = req.params.date;
+  let date;
+
+  if (!dateParam) {
+    // No date parameter → current time
+    date = new Date();
+  } else if (/^\d+$/.test(dateParam)) {
+    // Only digits → treat as milliseconds timestamp
+    date = new Date(Number(dateParam));
+  } else {
+    // Otherwise treat as date string
+    date = new Date(dateParam);
+  }
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    res.json({ error: "Invalid Date" });
+  } else {
+    res.json({ unix: date.getTime(), utc: date.toUTCString() });
+  }
+});
+
+// Listen on port
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port);
 });
